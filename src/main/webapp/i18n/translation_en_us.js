@@ -435,6 +435,16 @@ ORYX.I18N.SyntaxChecker.noErrors = "There are no validation errors.";
 ORYX.I18N.SyntaxChecker.invalid = "Invalid answer from server.";
 ORYX.I18N.SyntaxChecker.checkingMessage = "Validating ...";
 
+if(!ORYX.I18N.checkCompliance) ORYX.I18N.checkCompliance = {};
+
+ORYX.I18N.checkCompliance.group = "Compliance";
+ORYX.I18N.checkCompliance.name = "Compliance Check Process";
+ORYX.I18N.checkCompliance.desc = "Compliance Check Process";
+ORYX.I18N.checkCompliance.noErrors = "There are no compliance errors.";
+ORYX.I18N.checkCompliance.invalid = "Invalid answer from server.";
+ORYX.I18N.checkCompliance.checkingMessage = "Checking Compliance ...";
+
+
 if(!ORYX.I18N.Undo) ORYX.I18N.Undo = {};
 
 ORYX.I18N.Undo.group = "Undo";
@@ -772,6 +782,7 @@ ORYX.I18N.Node = "Node";
 
 /** New Language Properties: 03.06.2009*/
 ORYX.I18N.SyntaxChecker.notice = "Move the mouse over a red cross icon to see the error message.";
+ORYX.I18N.checkCompliance.notice = "Move the mouse over a red cross icon to see the error message.";
 
 ORYX.I18N.Validator.result = "Validation Result";
 ORYX.I18N.Validator.noErrors = "No validation errors found.";

@@ -31,6 +31,7 @@
     <plugin name="ORYX.Plugins.ConstraintExpressionEditor"/>
     <plugin name="ORYX.Plugins.Overlay"/>
     <plugin name="ORYX.Plugins.Dictionary"/>
+    <plugin name="ORYX.Plugins.Compliance"/>    
     <plugin name="ORYX.Plugins.CanvasTitle"/>
     <plugin name="ORYX.Plugins.InlineTaskFormEditor"/>
     <plugin name="ORYX.Plugins.ExtendedDataAssignmentEditor"/>

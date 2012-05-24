@@ -63,6 +63,11 @@
    <param-value>jbpm</param-value>
   </init-param>
  </servlet>
+  <servlet>
+  <display-name>ComplianceChecker</display-name>
+  <servlet-name>ComplianceCheckerServlet</servlet-name>
+  <servlet-class>org.jbpm.designer.web.server.ComplianceCheckerServlet</servlet-class>
+ </servlet>
  <servlet>
   <display-name>Transformer</display-name>
   <servlet-name>TransformerServlet</servlet-name>
@@ -147,6 +152,10 @@
  <servlet-mapping>
   <servlet-name>EditorHandler</servlet-name>
   <url-pattern>/editor/*</url-pattern>
+ </servlet-mapping>
+  <servlet-mapping>
+  <servlet-name>ComplianceCheckerServlet</servlet-name>
+  <url-pattern>/compliancecheck</url-pattern>
  </servlet-mapping>
  <servlet-mapping>
   <servlet-name>DirectoryListingServlet</servlet-name>

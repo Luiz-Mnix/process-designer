@@ -334,6 +334,7 @@
 		</plugin>
 		
 		<plugin source="dictionary.js" name="ORYX.Plugins.Dictionary"/>
+		<plugin source="complianceCheck.js" name="ORYX.Plugins.Compliance"/>
 		<plugin source="canvastitle.js" name="ORYX.Plugins.CanvasTitle"/>
 		<plugin source="inlinetaskformeditor.js" name="ORYX.Plugins.InlineTaskFormEditor"/>
 		<plugin source="processinfo.js" name="ORYX.Plugins.ProcessInfo"/>
