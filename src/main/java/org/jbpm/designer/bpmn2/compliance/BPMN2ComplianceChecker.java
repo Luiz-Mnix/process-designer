@@ -80,7 +80,6 @@ public class BPMN2ComplianceChecker {
 	protected Map<Object, List<Object>> finalSmList = new HashMap<Object, List<Object>>();
 	protected Map<Object, List<Object>> finalUmList = new HashMap<Object, List<Object>>();
 	
-	//protected List<FlowNode> tmp = new ArrayList<FlowNode>();
 	protected List<Object> tmp = new ArrayList<Object>();
 
 	private String json;
@@ -88,9 +87,7 @@ public class BPMN2ComplianceChecker {
 	private IDiagramProfile profile;
 	private String defaultResourceId = "";
 	private String uuid;
-	
-    //static NodeSequence nodes[] = new NodeSequence[50];
-    
+	    
 	private static final Logger _logger = Logger.getLogger(BPMN2ComplianceChecker.class);
 	
 	public BPMN2ComplianceChecker(Definitions smdef, Definitions udmdef) {
