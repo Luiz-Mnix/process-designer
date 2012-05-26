@@ -28,14 +28,20 @@ import org.apache.commons.collections.MultiHashMap;
 import org.apache.commons.collections.MultiMap;
 import org.apache.commons.io.IOUtils;
 import org.apache.log4j.Logger;
+import org.eclipse.bpmn2.Activity;
 import org.eclipse.bpmn2.Artifact;
+import org.eclipse.bpmn2.Assignment;
 import org.eclipse.bpmn2.BaseElement;
 import org.eclipse.bpmn2.BusinessRuleTask;
 import org.eclipse.bpmn2.CallActivity;
 import org.eclipse.bpmn2.CatchEvent;
 import org.eclipse.bpmn2.CompensateEventDefinition;
 import org.eclipse.bpmn2.ConditionalEventDefinition;
+import org.eclipse.bpmn2.DataInput;
+import org.eclipse.bpmn2.DataInputAssociation;
 import org.eclipse.bpmn2.DataObject;
+import org.eclipse.bpmn2.DataOutput;
+import org.eclipse.bpmn2.DataOutputAssociation;
 import org.eclipse.bpmn2.Definitions;
 import org.eclipse.bpmn2.EndEvent;
 import org.eclipse.bpmn2.ErrorEventDefinition;
@@ -60,12 +66,13 @@ import org.eclipse.bpmn2.TimerEventDefinition;
 import org.eclipse.bpmn2.UserTask;
 import org.eclipse.emf.ecore.util.FeatureMap;
 import org.jbpm.designer.bpmn2.validation.SyntaxCheckerUtils;
+import org.jbpm.designer.taskforms.TaskFormInfo;
 import org.jbpm.designer.web.profile.IDiagramProfile;
 import org.jbpm.designer.web.profile.impl.ExternalInfo;
 import org.jbpm.designer.web.server.ServletUtil;
 import org.json.JSONObject;
 import sun.misc.BASE64Encoder;
-
+import org.jbpm.designer.bpmn2.compliance.NodeDataInfo;
 
 public class BPMN2ComplianceChecker {
 	public static final String EXT_BPMN = "bpmn";
@@ -79,6 +86,9 @@ public class BPMN2ComplianceChecker {
 	protected Map<Object, List<Object>> tmpUmList = new HashMap<Object, List<Object>>();
 	protected Map<Object, List<Object>> finalSmList = new HashMap<Object, List<Object>>();
 	protected Map<Object, List<Object>> finalUmList = new HashMap<Object, List<Object>>();
+	
+    protected Map<Object, NodeDataInfo> smDataInfo = new HashMap<Object, NodeDataInfo>();
+    protected Map<Object, NodeDataInfo> udDataInfo = new HashMap<Object, NodeDataInfo>();
 	
 	protected List<Object> tmp = new ArrayList<Object>();
 
@@ -101,11 +111,6 @@ public class BPMN2ComplianceChecker {
 		List<RootElement> udmrootElements =  udmdef.getRootElements();
 		List<RootElement> smrootElements =  smdef.getRootElements();
 		
-
-	try{
-			  // Create file 
-			  FileWriter fstream = new FileWriter("root1.log",false);
-			  BufferedWriter out = new BufferedWriter(fstream);
 		
 		for(RootElement root : udmrootElements) {
 			if(root instanceof Process) {
@@ -122,8 +127,6 @@ public class BPMN2ComplianceChecker {
             		if(fe instanceof FlowNode) {
             			if(!(fe instanceof StartEvent) && !(fe instanceof EndEvent) && !(fe instanceof Gateway)) {
             				udmList.add(fe.getName());	
-//            				nodes[count] = new NodeSequence(fe.getId(), fe.getName(), "");
-//            				count++;
            				}
        				}
            		}            	
@@ -139,7 +142,6 @@ public class BPMN2ComplianceChecker {
            			if(fe instanceof FlowNode) {
            				if(!(fe instanceof StartEvent) && !(fe instanceof EndEvent) && !(fe instanceof Gateway)) {
            						smList.add(fe.getName());
-           						//out.write(fe.getName()+"\n");
            				}
        				}
            		}        	
@@ -151,7 +153,6 @@ public class BPMN2ComplianceChecker {
 		   while(iter.hasNext()){
 			   Object element = iter.next();
 			   if(!(udmList.contains(element))){
-				   //out.write(element+"\n\n");
 				   addError(defaultResourceId, "Missing Node: "+element);
 			   }
 		   }
@@ -166,9 +167,7 @@ public class BPMN2ComplianceChecker {
 	           		for(FlowElement fe : flowElements) {
 	           			if(fe instanceof SequenceFlow) {
 	        				SequenceFlow sf = (SequenceFlow) fe;
-	        				//if(!(sf.getSourceRef() instanceof StartEvent)&&!(sf.getTargetRef() instanceof EndEvent)){
 	        				if(!(sf.getTargetRef() instanceof EndEvent)){
-	        					out.write(sf.getTargetRef().getName()+":"+sf.getTargetRef().getId()+"\t"+sf.getSourceRef().getName()+":"+sf.getSourceRef().getId()+"\n");
 	        					addSequenceFlow(sf.getTargetRef(),sf.getSourceRef());
 	        				}
 		           		}
@@ -178,7 +177,6 @@ public class BPMN2ComplianceChecker {
 				}
 		   }
 		   
-		   out.write("\n\n");
 		   //UD
 		   for(RootElement root : udmrootElements) {
 				if(root instanceof Process) {
@@ -188,9 +186,7 @@ public class BPMN2ComplianceChecker {
 	           		for(FlowElement fe : flowElements) {
 	           			if(fe instanceof SequenceFlow) {
 	        				SequenceFlow sf = (SequenceFlow) fe;
-	        				//if(!(sf.getSourceRef() instanceof StartEvent)&&!(sf.getTargetRef() instanceof EndEvent)){
 	        				if(!(sf.getTargetRef() instanceof EndEvent)){
-	        					out.write(sf.getTargetRef().getName()+":"+sf.getTargetRef().getId()+"\t"+sf.getSourceRef().getName()+":"+sf.getSourceRef().getId()+"\n");
 	        					addSequenceFlowUdm(sf.getTargetRef(),sf.getSourceRef());
 	        				}
 		           		}
@@ -206,7 +202,6 @@ public class BPMN2ComplianceChecker {
 		   		Map.Entry me = (Map.Entry)iter1.next(); 
 		   		FlowNode sf = (FlowNode) me.getKey();
 		   		if(!(sf instanceof Gateway)) {
-		   			//out.write("\n"+sf.getName() +"\t");
 			   		List current = new ArrayList();
 			   		current = tmpSmList.get(me.getKey());
 			   		List<Object> _obj = new ArrayList<Object>();
@@ -215,14 +210,12 @@ public class BPMN2ComplianceChecker {
 		   				FlowNode ssf = (FlowNode) temp;
 		   				if(!(ssf instanceof Gateway)) {
 		   					_obj.add(temp);  
-		   					//out.write(ssf.getName()+ " ,"); 
 		   				}
 		   				if(ssf instanceof Gateway) {
 		   					findTarget(temp);	   					
 		   					for(Object _current:tmp){
 		   						_obj.add(_current); 
 		   						FlowNode _val = (FlowNode) _current;
-		   						//out.write(_val.getName() + " ,");
 		   					}
 		   				}
 			   		}
@@ -235,7 +228,6 @@ public class BPMN2ComplianceChecker {
    			Iterator iter3 = set3.iterator();
 		   	while(iter3.hasNext()){
 		   		tmp.clear();
-				//out.write("\n\n");
 		   		Map.Entry me = (Map.Entry)iter3.next(); 
 		   		FlowNode sf = (FlowNode) me.getKey();
 		   		List<Object> _obj = new ArrayList<Object>();
@@ -243,8 +235,6 @@ public class BPMN2ComplianceChecker {
 			   			findTargetUdm(sf);
 			   			for(Object _current:tmp){
 	   						_obj.add(_current); 
-	   						//FlowNode _val = (FlowNode) _current;
-	   						//out.write(_current + "\n");
 	   					}
 			   			finalUmList.put(sf,_obj);
 		   		}
@@ -252,53 +242,22 @@ public class BPMN2ComplianceChecker {
 
 			for (Map.Entry<Object, List<Object>> entry : tmpSmList.entrySet()) {
 				FlowNode _key = (FlowNode) entry.getKey();
-				out.write("\n"+_key.getName() +"\t");
 		   		List<Object> current = new ArrayList<Object>();
 		   		current = entry.getValue();
 		   		for(Object _value:current ) {
 		   			FlowNode sf = (FlowNode) _value;
-		   			out.write(sf.getName()+ " | ");
 		   		}
 			}
-			
-			out.write("\n\n******************\n\n");
-			
+						
 			for (Map.Entry<Object, List<Object>> entry : finalSmList.entrySet()) {
 				FlowNode _key = (FlowNode) entry.getKey();
-				out.write("\n"+_key.getName() +"\t");
 		   		List<Object> current = new ArrayList<Object>();
 		   		current = entry.getValue();
 		   		for(Object _value:current ) {
 		   			FlowNode sf = (FlowNode) _value;
-		   			out.write(sf.getName()+ " | ");
 		   		}
 			}
 			 			
-			out.write("\n\n******************\n\n");
-			
-			for (Map.Entry<Object, List<Object>> entry : tmpUmList.entrySet()) {
-				FlowNode _key = (FlowNode) entry.getKey();
-				out.write("\n"+_key.getName() +"\t");
-		   		List<Object> current = new ArrayList<Object>();
-		   		current = entry.getValue();
-		   		for(Object _value:current ) {
-		   			FlowNode sf = (FlowNode) _value;
-		   			out.write(sf.getName()+ " | ");
-		   		}
-			}
-			
-			out.write("\n\n******************\n\n");
-			
-			for (Map.Entry<Object, List<Object>> entry : finalUmList.entrySet()) {
-				FlowNode _key = (FlowNode) entry.getKey();
-				out.write("\n"+_key.getName() +"\t");
-		   		List<Object> current = new ArrayList<Object>();
-		   		current = entry.getValue();
-		   		for(Object _value:current ) {
-		   			FlowNode sf = (FlowNode) _value;
-		   			out.write(sf.getName()+ " | ");
-		   		}
-			}
 			
 			for (Map.Entry<Object, List<Object>> entrySm : finalSmList.entrySet()) {
 				boolean match = false;
@@ -318,19 +277,15 @@ public class BPMN2ComplianceChecker {
 				   		
 				   		for(Object _valueSm:currentSm ) {
 				   			FlowNode fnSm = (FlowNode) _valueSm;
-				   			//if(fnSm.getName() != "") {
 					   			for(Object _valueUd:currentUd) {				   				
 						   			FlowNode fnUd = (FlowNode) _valueUd;
-					   				//if((fnSm.getName()).equals(fnUd.getName()) || fnSm.getName().equals("Start")){
 					   				if((fnSm.getName()).equals(fnUd.getName()) || (fnSm instanceof StartEvent)){
 
 					   					foundError = false;
 					   				} 
 					   			}
-				   			//}
 				   			if(foundError){
 				   				FlowNode udKey = (FlowNode) entryUd.getKey();
-						   		//out.write("\n"+udKey.getId()+ "Missiong Pre-condition node: "+fnSm.getName());
 						   		addError(udKey.getId(), "Missing Pre-condition node: "+fnSm.getName());
 				   			}
 				   			foundError = false;
@@ -338,14 +293,71 @@ public class BPMN2ComplianceChecker {
 					}
 				}
 			}
-			
-						
-		   		out.close();
-	          		  }catch (Exception e){//Catch exception if any
-	          		  System.err.println("Error: " + e.getMessage());
-	          		  }
 	          		
-	          	}
+	    // collect sm usertask & input / output data      		
+  		for(RootElement root : smrootElements) {
+			if(root instanceof Process) {
+        		Process process = (Process) root;
+        		
+        		smCheckData(process);
+		
+			}
+  		}
+	    
+  		// collect ud usertask & input / output data
+  		for(RootElement root : udmrootElements) {
+			if(root instanceof Process) {
+        		Process process = (Process) root;
+        		
+        		udCheckData(process);
+		
+			}
+  		}
+  		
+  		// comparison check sm & ud usertask
+  		
+		for (Map.Entry<Object, NodeDataInfo> _smDataInfo : smDataInfo.entrySet()) {
+			FlowNode smFn = (FlowNode) _smDataInfo.getKey();
+
+			if(!(udDataInfo.isEmpty())){
+				for (Map.Entry<Object, NodeDataInfo> _udDataInfo : udDataInfo.entrySet()) {
+					FlowNode udFn = (FlowNode) _udDataInfo.getKey();
+					if (smFn.getName().equals(udFn.getName())) {
+						NodeDataInfo udCurrent = _udDataInfo.getValue();;
+						NodeDataInfo smCurrent = _smDataInfo.getValue();
+						for(Object _nd : smCurrent.getDataIn()){
+							if(!(udCurrent.getDataIn().contains(_nd))){
+								addError(udFn.getId(),"Missing Data Input:" + _nd);
+							}
+						}
+						
+						for(Object _nd : smCurrent.getDataOut()){
+							if(!(udCurrent.getDataOut().contains(_nd))){
+								addError(udFn.getId(),"Missing Data Output:" + _nd);
+							}
+						}
+		
+					}
+				} 
+			} else {
+				for (Map.Entry<Object, List<Object>> entry : tmpUmList.entrySet()) {
+					FlowNode _key = (FlowNode) entry.getKey();
+					if (smFn.getName().equals(_key.getName())) {
+						NodeDataInfo smCurrent = _smDataInfo.getValue();
+						for(Object _nd : smCurrent.getDataIn()){
+							addError(_key.getId(),"Missing Data Input:" + _nd);
+						}
+						for(Object _nd : smCurrent.getDataOut()){
+							addError(_key.getId(),"Missing Data Output:" + _nd);
+						}						
+					}
+				}
+			
+			}
+		}
+			
+			
+	}
 	
 
 	private void findTarget(Object _obj){
@@ -391,42 +403,13 @@ public class BPMN2ComplianceChecker {
 		   					if(!tmp.contains(ssf)) {
 		   						tmp.add(temp);
 		   					}
-		   				} else {
+		   				}
 			   				_obj = ssf;
 			   				findTargetUdm(ssf);
-		   				}
 		   			}
 	   	       }
 	   	   }
 	}
-/*
- * private void findTargetUdm(Object _obj){
-   	    
-		Set set = tmpUmList.entrySet(); 
-		Iterator iter1 = set.iterator();
-		while(iter1.hasNext()){
-			Map.Entry me = (Map.Entry)iter1.next(); 
-			FlowNode sf = (FlowNode) me.getKey();
-				if (_obj.equals(sf)) {
-			   		List current = new ArrayList();
-			   		current = tmpUmList.get(me.getKey());
-			   		for(Object temp: current ) {
-		   				FlowNode ssf = (FlowNode) temp;
-		   				if(!(ssf instanceof Gateway)){
-		   					if(!tmp.contains(ssf)) {
-		   						tmp.add(temp);
-		   					}
-			   			} else {
-			   			if((ssf instanceof Gateway) && ((FlowNode) me.getKey() instanceof Gateway)){ 
-			   				_obj = ssf;
-			   				findTargetUdm(ssf);
-			   			}
-			   		}
-			   	}
-	   	       }
-	   	   }
-	}*/
-	
 	
 	private void addSequenceFlow(Object resourceId, Object obj) {		
 		if(tmpSmList.containsKey(resourceId) && tmpSmList.get(resourceId) != null) {
@@ -448,319 +431,68 @@ public class BPMN2ComplianceChecker {
 		}
 	}
 
-	public void checkSyntax_bak() {
-		
-		List<RootElement> rootElements =  smdef.getRootElements();
-
-        for(RootElement root : rootElements) {
-        	if(root instanceof Process) {
-        		Process process = (Process) root;
-        		if(process.getFlowElements() != null && process.getFlowElements().size() > 0) {
-        			defaultResourceId = process.getFlowElements().get(0).getId();
-        		}
-        		
-        		if(isEmpty(process.getId())) {
-        			addError(defaultResourceId, "Process has no id.");
-        		} else {
-        			if(!SyntaxCheckerUtils.isNCName(process.getId())) {
-        				addError(defaultResourceId, "Invalid process id. See http://www.w3.org/TR/REC-xml-names/#NT-NCName for more info.");
-        			} else {
-        				String[] packageAssetInfo = ServletUtil.findPackageAndAssetInfo(uuid, profile);
-		        		String processImageName = process.getId() + "-image";
-		        		if(!ServletUtil.assetExistsInGuvnor(packageAssetInfo[0], processImageName, profile)) {
-		        			addError(defaultResourceId, "Could not find process image.");
-		        		}
-        			}
-        		}
-        		
-        		String pname = null;
-        		Iterator<FeatureMap.Entry> iter = process.getAnyAttribute().iterator();
-        		boolean foundPackageName = false;
-                while(iter.hasNext()) {
-                    FeatureMap.Entry entry = iter.next();
-                    if(entry.getEStructuralFeature().getName().equals("packageName")) {
-                    	foundPackageName = true;
-                        pname = (String) entry.getValue();
-                        if(isEmpty(pname)) {
-                        	addError(defaultResourceId, "Process has no package name.");
-                        }
-                    }
-                }
-                if(!foundPackageName) {
-                	addError(defaultResourceId, "Process has no package name.");
-                } else {
-                	if(!isEmpty(pname)) {
-                		String[] packageAssetInfo = findPackageAndAssetInfo(uuid, profile);
-                		String guvnorPackageName = packageAssetInfo[0];
-                		if(!guvnorPackageName.equals(pname)) {
-                			addError(defaultResourceId, "Process package name is not valid.");
-                		}
+	
+	
+	private void smCheckData(FlowElementsContainer container) {
+					  
+		for(FlowElement fe : container.getFlowElements()) {
+					
+			if(fe instanceof Activity) {
+				Activity ut = (Activity) fe;
+				FlowNode fn = (FlowNode) fe;
+				List<DataInput> dataInputs = ut.getIoSpecification().getDataInputs();
+                List<DataOutput> dataOutputs = ut.getIoSpecification().getDataOutputs();
+                List<DataInputAssociation> dataInputAssociations = ut.getDataInputAssociations();
+                List<DataOutputAssociation> dataOutputAssociations = ut.getDataOutputAssociations();
+                
+                List<String> dataIn = new ArrayList<String>();
+                List<String> dataOut = new ArrayList<String>();
+                
+                for(DataInput din : dataInputs) {
+                	if(!(din.getName().equals("TaskName"))){
+                		dataIn.add(din.getName());
                 	}
                 }
+                for(DataOutput din : dataOutputs) {
+            		dataOut.add(din.getName());
+                }
                 
-                if(isEmpty(process.getName())) {
-        			addError(defaultResourceId, "Process has no name.");
-        		}
-                
-                boolean foundStartEvent = false;
-                boolean foundEndEvent = false;
-        		List<FlowElement> flowElements =  process.getFlowElements();
-        		for(FlowElement fe : flowElements) {
-        			if(fe instanceof StartEvent) {
-        				foundStartEvent = true;
-        			}
-        			if(fe instanceof EndEvent) {
-        				foundEndEvent = true;
-        			}
-        		}
-        		if(!foundStartEvent && !isAdHocProcess(process)) {
-        			addError(defaultResourceId, "Process has no start node.");
-        		}
-        		if(!foundEndEvent && !isAdHocProcess(process)) {
-        			addError(defaultResourceId, "Process has no end node.");
-        		}
-        		
-        		checkFlowElements(process);
-        	}
-        }
+                if(!(dataInputs.isEmpty() || !(dataOutputs.isEmpty()))){ 
+	                NodeDataInfo nodeDataInfo = new NodeDataInfo(dataIn, dataOut);
+	        		smDataInfo.put(fn, nodeDataInfo); 
+                }
+            }
+		}
 	}
 	
-	private void checkFlowElements(FlowElementsContainer container) {
+	private void udCheckData(FlowElementsContainer container) {
 		
 		for(FlowElement fe : container.getFlowElements()) {
-			if(fe instanceof StartEvent) {
-				StartEvent se = (StartEvent) fe;
-				if(se.getOutgoing() == null && se.getOutgoing().size() < 1) {
-					addError(se, "Start node has no outgoing connections");
-				}
-			} else if (fe instanceof EndEvent) {
-				EndEvent ee = (EndEvent) fe;
-				if(ee.getIncoming() == null && ee.getIncoming().size() < 1) {
-					addError(ee, "End node has no outgoing connections");
-				}
-			} else {
-				if(fe instanceof FlowNode) {
-					FlowNode fn = (FlowNode) fe;
-					if(fn.getOutgoing() == null && fn.getOutgoing().size() < 1) {
-    					addError(fn, "Node has no outgoing connections");
-    				}
-					if(fn.getIncoming() == null && fn.getIncoming().size() < 1) {
-    					addError(fn, "Node has no outgoing connections");
-    				}
-				}
-			}
-			
-			if(fe instanceof BusinessRuleTask) {
-				BusinessRuleTask bt = (BusinessRuleTask) fe;
-				Iterator<FeatureMap.Entry> biter = bt.getAnyAttribute().iterator();
-				boolean foundRuleflowGroup = false;
-	            while(biter.hasNext()) {
-	                FeatureMap.Entry entry = biter.next();
-	                if(entry.getEStructuralFeature().getName().equals("ruleFlowGroup")) {
-	                	foundRuleflowGroup = true;
-	                	String ruleflowGroup = (String) entry.getValue();
-	                	if(isEmpty(ruleflowGroup)) {
-	                		addError(bt, "Business Rule Task has no ruleflow-group.");
-	                	}
-	                }
-	            }
-	            if(!foundRuleflowGroup) {
-	            	addError(bt, "Business Rule Task has no ruleflow-group.");
-	            }
-			}
-			
-			if(fe instanceof ScriptTask) {
-				ScriptTask st = (ScriptTask) fe;
-				if(isEmpty(st.getScript())) {
-					addError(st, "Script Task has no script.");
-				}
-				if(isEmpty(st.getScriptFormat())) {
-					addError(st, "Script Task has no script format.");
-				}
-			}
-			
-			if(fe instanceof SendTask) {
-				SendTask st = (SendTask) fe;
-				if(st.getOperationRef() == null) {
-					addError(st, "Send Task has no operation.");
-				}
-				if(st.getMessageRef() == null) {
-					addError(st, "Send Task has no message.");
-				}
-			}
-			
-			if(fe instanceof UserTask) {
-				UserTask ut = (UserTask) fe;
-				String taskName = null;
-				Iterator<FeatureMap.Entry> utiter = ut.getAnyAttribute().iterator();
-				boolean foundTaskName = false;
-		        while(utiter.hasNext()) {
-		            FeatureMap.Entry entry = utiter.next();
-		            if(entry.getEStructuralFeature().getName().equals("taskName")) {
-		            	foundTaskName = true;
-		            	taskName = (String) entry.getValue();
-		            	if(isEmpty(taskName)) {
-		            		addError(ut, "User Task has no task name.");
-		            	}
-		            }
-		        }
-		        if(!foundTaskName) {
-		        	addError(ut, "User Task has no task name.");
-		        } else {
-		        	if(taskName != null) {
-		        		String[] packageAssetInfo = findPackageAndAssetInfo(uuid, profile);
-		        		String packageName = packageAssetInfo[0];
-		        		String assetName = packageAssetInfo[1];
-		        		String taskFormName = taskName + "-taskform";
-		        		if(!taskFormExistsInGuvnor(packageName, assetName, taskFormName, profile)) {
-		        			addError(ut, "User Task has no task form defined.");
-		        		}
-		        	} 
-		        }
-			}
-			
-			if(fe instanceof CatchEvent) {
-				CatchEvent event = (CatchEvent) fe;
-				List<EventDefinition> eventdefs = event.getEventDefinitions();
-				for(EventDefinition ed : eventdefs) {
-    				if(ed instanceof TimerEventDefinition) {
-    	                TimerEventDefinition ted = (TimerEventDefinition) ed;
-    	                if(ted.getTimeDate() == null) {
-    	                	addError(event, "Catch Event has no timedate.");
-    	                }
-    	                if(ted.getTimeDuration() == null) {
-    	                	addError(event, "Catch Event has no timeduration.");
-    	                }
-    	                if(ted.getTimeCycle() == null) {
-    	                	addError(event, "Catch Event has no timecycle.");
-    	                }
-    	            } else if( ed instanceof SignalEventDefinition) {
-    	                if(((SignalEventDefinition) ed).getSignalRef() == null) {
-    	                	addError(event, "Catch Event has no signalref.");
-    	                }
-    	            } else if( ed instanceof ErrorEventDefinition) {
-    	                if(((ErrorEventDefinition) ed).getErrorRef() == null || ((ErrorEventDefinition) ed).getErrorRef().getErrorCode() == null) {
-    	                	addError(event, "Catch Event has no errorref.");
-    	                }
-    	            } else if( ed instanceof ConditionalEventDefinition ) {
-    	                FormalExpression conditionalExp = (FormalExpression) ((ConditionalEventDefinition) ed).getCondition();
-    	                if(conditionalExp.getBody() == null) {
-    	                	addError(event, "Catch Event has no conditionexpression.");
-    	                }
-    	            } else if( ed instanceof EscalationEventDefinition ) {
-    	                if(((EscalationEventDefinition) ed).getEscalationRef() == null) {
-    	                	addError(event, "Catch Event has no escalationref.");
-    	                }
-    	            } else if( ed instanceof MessageEventDefinition) {
-    	                if(((MessageEventDefinition) ed).getMessageRef() == null) {
-    	                    addError(event, "Catch Event has no messageref.");
-    	                }
-    	            }  else if( ed instanceof CompensateEventDefinition) {
-    	                if(((CompensateEventDefinition) ed).getActivityRef() == null) {
-    	                	addError(event, "Catch Event has no activityref.");
-    	                }
-    	            } 
-				}
-			}
-			
-			if(fe instanceof ThrowEvent) {
-				ThrowEvent event = (ThrowEvent) fe;
-				List<EventDefinition> eventdefs = event.getEventDefinitions();
-		        for(EventDefinition ed : eventdefs) {
-		            if(ed instanceof TimerEventDefinition) {
-		                TimerEventDefinition ted = (TimerEventDefinition) ed;
-		                if(ted.getTimeDate() == null) {
-		                	addError(event, "Throw Event has no timedate.");
-		                }
-		                if(ted.getTimeDuration() == null) {
-		                	addError(event, "Throw Event has no timeduration.");
-		                }
-		                if(ted.getTimeCycle() != null) {
-		                	addError(event, "Throw Event has no timecycle.");
-		                }
-		            } else if( ed instanceof SignalEventDefinition) {
-		                if(((SignalEventDefinition) ed).getSignalRef() == null) {
-		                	addError(event, "Throw Event has no signalref.");
-		                }
-		            } else if( ed instanceof ErrorEventDefinition) {
-		                if(((ErrorEventDefinition) ed).getErrorRef() == null || ((ErrorEventDefinition) ed).getErrorRef().getErrorCode() == null) {
-		                	addError(event, "Throw Event has no errorref.");
-		                }
-		            } else if( ed instanceof ConditionalEventDefinition ) {
-		                FormalExpression conditionalExp = (FormalExpression) ((ConditionalEventDefinition) ed).getCondition();
-		                if(conditionalExp.getBody() == null) {
-		                	addError(event, "Throw Event has no conditional expression.");
-		                }
-		            } else if( ed instanceof EscalationEventDefinition ) {
-		                if(((EscalationEventDefinition) ed).getEscalationRef() == null) {
-		                	addError(event, "Throw Event has no conditional escalationref.");
-		                }
-		            } else if( ed instanceof MessageEventDefinition) {
-		                if(((MessageEventDefinition) ed).getMessageRef() == null) {
-		                	addError(event, "Throw Event has no conditional messageref.");
-		                }
-		            }  else if( ed instanceof CompensateEventDefinition) {
-		                if(((CompensateEventDefinition) ed).getActivityRef() == null) {
-		                	addError(event, "Throw Event has no conditional activityref.");
-		                }
-		            }  
-		        }
-			}
-			
-			if(fe instanceof SequenceFlow) {
-				SequenceFlow sf = (SequenceFlow) fe;
-				if(sf.getSourceRef() == null) {
-					addError((SequenceFlow) fe, "An Edge must have a source node.");
-				}
-				if(sf.getTargetRef() == null) {
-					addError((SequenceFlow) fe, "An Edge must have a target node.");
-				}
-			}
-			
-			if(fe instanceof Gateway) {
-				Gateway gw = (Gateway) fe;
-				if(gw.getGatewayDirection() == null) {
-					addError((Gateway) fe, "Gateway has no direction.");
-				}
-			}
-			
-			if(fe instanceof CallActivity) {
-				CallActivity ca = (CallActivity) fe;
-				if(ca.getCalledElement() == null || ca.getCalledElement().length() < 1) {
-					addError((CallActivity) fe, "Reusable Subprocess has no called element specified.");
-				} else {
-					String[] packageAssetInfo = findPackageAndAssetInfo(uuid, profile);
-	        		String packageName = packageAssetInfo[0];
-	        		List<String> allProcessesInPackage = getAllProcessesInPackage(packageName, profile);
-	        		boolean foundCalledElementProcess = false;
-	        		for(String p : allProcessesInPackage) {
-	        			String processContent = getProcessSourceContent(packageName, p, profile);
-	        			Pattern pattern = Pattern.compile("<\\S*process[\\s\\S]*id=\"" + ca.getCalledElement() + "\"", Pattern.MULTILINE);
-	                    Matcher m = pattern.matcher(processContent);
-	                    if(m.find()) {
-	                    	foundCalledElementProcess = true;
-	                    	break;
-	                    }
-	        		}
-	        		if(!foundCalledElementProcess) {
-	        			addError((CallActivity) fe, "No existing process with id=" + ca.getCalledElement() + " could be found.");
-	        		}
-				}
-			}
-			
-			if(fe instanceof DataObject) {
-				DataObject dao = (DataObject) fe;
-				if(dao.getName() == null || dao.getName().length() < 1) {
-					addError((DataObject) fe, "Data Object has no name defined.");
-				} else {
-					if(containsWhiteSpace(dao.getName())) {
-						addError((DataObject) fe, "Data Object name contains white spaces.");
-					}
-				}
-			}
-			
-			if(fe instanceof SubProcess) {
-				checkFlowElements((SubProcess) fe);
+					
+			if(fe instanceof Activity) {
+				Activity ut = (Activity) fe;
+				FlowNode fn = (FlowNode) fe;
+				List<DataInput> dataInputs = ut.getIoSpecification().getDataInputs();
+                List<DataOutput> dataOutputs = ut.getIoSpecification().getDataOutputs();
+                List<DataInputAssociation> dataInputAssociations = ut.getDataInputAssociations();
+                List<DataOutputAssociation> dataOutputAssociations = ut.getDataOutputAssociations();
+                
+                List<String> dataIn = new ArrayList<String>();
+                List<String> dataOut = new ArrayList<String>();
+                
+                for(DataInput din : dataInputs) {
+                	if(!(din.getName().equals("TaskName"))){
+                		dataIn.add(din.getName());
+                	}
+                }
+                for(DataOutput din : dataOutputs) {
+            		dataOut.add(din.getName());
+                }
+                
+                if(!(dataInputs.isEmpty() || !(dataOutputs.isEmpty()))){ 
+	                NodeDataInfo nodeDataInfo = new NodeDataInfo(dataIn, dataOut);
+	        		udDataInfo.put(fn, nodeDataInfo);
+                }
 			}
 		}
 	}
