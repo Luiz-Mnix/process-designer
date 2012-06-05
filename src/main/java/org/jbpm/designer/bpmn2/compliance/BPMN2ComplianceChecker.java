@@ -52,8 +52,10 @@ import org.eclipse.bpmn2.FlowElementsContainer;
 import org.eclipse.bpmn2.FlowNode;
 import org.eclipse.bpmn2.FormalExpression;
 import org.eclipse.bpmn2.Gateway;
+import org.eclipse.bpmn2.ItemAwareElement;
 import org.eclipse.bpmn2.MessageEventDefinition;
 import org.eclipse.bpmn2.Process;
+import org.eclipse.bpmn2.Property;
 import org.eclipse.bpmn2.RootElement;
 import org.eclipse.bpmn2.ScriptTask;
 import org.eclipse.bpmn2.SendTask;
@@ -67,6 +69,8 @@ import org.eclipse.bpmn2.UserTask;
 import org.eclipse.emf.ecore.util.FeatureMap;
 import org.jbpm.designer.bpmn2.validation.SyntaxCheckerUtils;
 import org.jbpm.designer.taskforms.TaskFormInfo;
+import org.jbpm.designer.taskforms.TaskFormInput;
+import org.jbpm.designer.taskforms.TaskFormOutput;
 import org.jbpm.designer.web.profile.IDiagramProfile;
 import org.jbpm.designer.web.profile.impl.ExternalInfo;
 import org.jbpm.designer.web.server.ServletUtil;
@@ -91,12 +95,16 @@ public class BPMN2ComplianceChecker {
     protected Map<Object, NodeDataInfo> udDataInfo = new HashMap<Object, NodeDataInfo>();
 	
 	protected List<Object> tmp = new ArrayList<Object>();
+	
+	protected List<Object> smProcessVar;
+	protected List<Object> udProcessVar;
 
 	private String json;
 	private String preprocessingData;
 	private IDiagramProfile profile;
 	private String defaultResourceId = "";
 	private String uuid;
+	private Boolean stopLoop;
 	    
 	private static final Logger _logger = Logger.getLogger(BPMN2ComplianceChecker.class);
 	
@@ -111,6 +119,11 @@ public class BPMN2ComplianceChecker {
 		List<RootElement> udmrootElements =  udmdef.getRootElements();
 		List<RootElement> smrootElements =  smdef.getRootElements();
 		
+		try{
+			  // Create file 
+			  FileWriter fstream = new FileWriter("process.log",false);
+			  BufferedWriter out = new BufferedWriter(fstream);
+		out.write("\nprocess start\n\n");
 		
 		for(RootElement root : udmrootElements) {
 			if(root instanceof Process) {
@@ -119,8 +132,6 @@ public class BPMN2ComplianceChecker {
         			defaultResourceId = process.getFlowElements().get(0).getId();
         		}
         		
-        		int count = 0;
-
             	List<FlowElement> flowElements =  process.getFlowElements();
             	for(FlowElement fe : flowElements) {
             		
@@ -169,6 +180,7 @@ public class BPMN2ComplianceChecker {
 	        				SequenceFlow sf = (SequenceFlow) fe;
 	        				if(!(sf.getTargetRef() instanceof EndEvent)){
 	        					addSequenceFlow(sf.getTargetRef(),sf.getSourceRef());
+	        					out.write("\nsm ="+sf.getTargetRef().getName() +"\t"+ sf.getSourceRef().getName() );
 	        				}
 		           		}
 	           		}
@@ -188,88 +200,106 @@ public class BPMN2ComplianceChecker {
 	        				SequenceFlow sf = (SequenceFlow) fe;
 	        				if(!(sf.getTargetRef() instanceof EndEvent)){
 	        					addSequenceFlowUdm(sf.getTargetRef(),sf.getSourceRef());
+	        					out.write("\nud ="+sf.getTargetRef().getName() +"\t"+ sf.getSourceRef().getName() );
 	        				}
 		           		}
 	           		}
 				}
 		   }
 
+		   
 		   // Standard Model
-   			Set set = tmpSmList.entrySet(); 
-   			Iterator iter1 = set.iterator();
-		   	while(iter1.hasNext()){
+		  
+			for (Map.Entry<Object, List<Object>> entry : tmpSmList.entrySet()) {
 		   		tmp.clear();
-		   		Map.Entry me = (Map.Entry)iter1.next(); 
-		   		FlowNode sf = (FlowNode) me.getKey();
-		   		if(!(sf instanceof Gateway)) {
-			   		List current = new ArrayList();
-			   		current = tmpSmList.get(me.getKey());
+				FlowNode _key = (FlowNode) entry.getKey();
+				if(!(_key instanceof Gateway)){
 			   		List<Object> _obj = new ArrayList<Object>();
-			   		
-			   		for(Object temp: current ) {
-		   				FlowNode ssf = (FlowNode) temp;
-		   				if(!(ssf instanceof Gateway)) {
-		   					_obj.add(temp);  
-		   				}
-		   				if(ssf instanceof Gateway) {
-		   					findTarget(temp);	   					
-		   					for(Object _current:tmp){
-		   						_obj.add(_current); 
-		   						FlowNode _val = (FlowNode) _current;
-		   					}
-		   				}
-			   		}
-			   		finalSmList.put(sf,_obj);
-		   		}
+					findTarget(_key);
+		   			for(Object _current:tmp){
+						_obj.add(_current); 
+					}
+			   		finalSmList.put(_key,_obj);
+				}
 		   	} 
-		   	
+		    
 		   	// User Define
-		   	Set set3 = tmpUmList.entrySet(); 
-   			Iterator iter3 = set3.iterator();
-		   	while(iter3.hasNext()){
+			for (Map.Entry<Object, List<Object>> entry : tmpUmList.entrySet()) {
 		   		tmp.clear();
-		   		Map.Entry me = (Map.Entry)iter3.next(); 
-		   		FlowNode sf = (FlowNode) me.getKey();
-		   		List<Object> _obj = new ArrayList<Object>();
-		   		if(!(sf instanceof Gateway) ) {
-			   			findTargetUdm(sf);
-			   			for(Object _current:tmp){
-	   						_obj.add(_current); 
-	   					}
-			   			finalUmList.put(sf,_obj);
-		   		}
-		   	} 
+		   		stopLoop = true;
+				FlowNode _key = (FlowNode) entry.getKey();
+				if(!(_key instanceof Gateway)){
+			   		List<Object> _obj = new ArrayList<Object>();
+					findTargetUdm(_key,_key);
+		   			for(Object _current:tmp){
+   						_obj.add(_current); 
+   					}
+			   		finalUmList.put(_key,_obj);
+				}
+			}
+			
 
 			for (Map.Entry<Object, List<Object>> entry : tmpSmList.entrySet()) {
 				FlowNode _key = (FlowNode) entry.getKey();
-		   		List<Object> current = new ArrayList<Object>();
+	   			out.write("\nsm tmp = "+_key.getName()+" - "+_key.getId());
+
+				List<Object> current = new ArrayList<Object>();
 		   		current = entry.getValue();
 		   		for(Object _value:current ) {
 		   			FlowNode sf = (FlowNode) _value;
+		   			out.write(" || "+sf.getName()+" - "+sf.getId());
 		   		}
 			}
 						
 			for (Map.Entry<Object, List<Object>> entry : finalSmList.entrySet()) {
 				FlowNode _key = (FlowNode) entry.getKey();
-		   		List<Object> current = new ArrayList<Object>();
+	   			out.write("\nsm final = "+_key.getName()+" - "+_key.getId());
+
+				List<Object> current = new ArrayList<Object>();
 		   		current = entry.getValue();
 		   		for(Object _value:current ) {
 		   			FlowNode sf = (FlowNode) _value;
+		   			out.write(" || "+sf.getName()+" - "+sf.getId());
 		   		}
 			}
-			 			
 			
+			for (Map.Entry<Object, List<Object>> entry : tmpUmList.entrySet()) {
+				FlowNode _key = (FlowNode) entry.getKey();
+	   			out.write("\nud tmp = "+_key.getName()+" - "+_key.getId());
+
+				List<Object> current = new ArrayList<Object>();
+		   		current = entry.getValue();
+		   		for(Object _value:current ) {
+		   			FlowNode sf = (FlowNode) _value;
+		   			out.write(" || "+sf.getName()+" - "+sf.getId());
+		   		}
+			}
+						
+			for (Map.Entry<Object, List<Object>> entry : finalUmList.entrySet()) {
+				FlowNode _key = (FlowNode) entry.getKey();
+	   			out.write("\nud final = "+_key.getName()+" - "+_key.getId());
+
+				List<Object> current = new ArrayList<Object>();
+		   		current = entry.getValue();
+		   		for(Object _value:current ) {
+		   			FlowNode sf = (FlowNode) _value;
+		   			out.write(" || "+sf.getName()+" - "+sf.getId());
+		   		}
+			}
+			
+			 			
+	  		// comparison model sm & ud usertask
+
 			for (Map.Entry<Object, List<Object>> entrySm : finalSmList.entrySet()) {
-				boolean match = false;
+				//boolean match = false;
 				FlowNode _keySm = (FlowNode) entrySm.getKey();
 
 				for (Map.Entry<Object, List<Object>> entryUd : finalUmList.entrySet()) {
-					boolean foundError = true;
 
 					FlowNode _keyUd = (FlowNode) entryUd.getKey();
 					
 					if(_keySm.getName().equals(_keyUd.getName())){
-						match = true; 
+						//match = true; 
 				   		List<Object> currentSm = new ArrayList<Object>();
 				   		List<Object> currentUd = new ArrayList<Object>();
 				   		currentSm = entrySm.getValue();
@@ -277,18 +307,21 @@ public class BPMN2ComplianceChecker {
 				   		
 				   		for(Object _valueSm:currentSm ) {
 				   			FlowNode fnSm = (FlowNode) _valueSm;
+				   				boolean foundError = true;
 					   			for(Object _valueUd:currentUd) {				   				
 						   			FlowNode fnUd = (FlowNode) _valueUd;
-					   				if((fnSm.getName()).equals(fnUd.getName()) || (fnSm instanceof StartEvent)){
-
+					   				if((fnSm.getName()).equals(fnUd.getName())){// || (fnSm instanceof StartEvent)){
 					   					foundError = false;
-					   				} 
+					   				}
+					   				if(fnSm instanceof StartEvent && fnUd instanceof StartEvent){
+					   					foundError = false;
+					   				}
 					   			}
-				   			if(foundError){
-				   				FlowNode udKey = (FlowNode) entryUd.getKey();
-						   		addError(udKey.getId(), "Missing Pre-condition node: "+fnSm.getName());
-				   			}
-				   			foundError = false;
+					   			if(foundError){
+					   				FlowNode udKey = (FlowNode) entryUd.getKey();
+							   		addError(udKey.getId(), "Missing Pre-condition node: "+fnSm.getName());
+					   			}
+					   			//foundError = false;
 				   		}
 					}
 				}
@@ -298,9 +331,7 @@ public class BPMN2ComplianceChecker {
   		for(RootElement root : smrootElements) {
 			if(root instanceof Process) {
         		Process process = (Process) root;
-        		
         		smCheckData(process);
-		
 			}
   		}
 	    
@@ -308,24 +339,23 @@ public class BPMN2ComplianceChecker {
   		for(RootElement root : udmrootElements) {
 			if(root instanceof Process) {
         		Process process = (Process) root;
-        		
-        		udCheckData(process);
-		
+        		udCheckData(process);		
 			}
   		}
   		
-  		// comparison check sm & ud usertask
-  		
-		for (Map.Entry<Object, NodeDataInfo> _smDataInfo : smDataInfo.entrySet()) {
+  		// comparison data sm & ud usertask
+  		for (Map.Entry<Object, NodeDataInfo> _smDataInfo : smDataInfo.entrySet()) {
 			FlowNode smFn = (FlowNode) _smDataInfo.getKey();
-
+			out.write("\n"+smFn.getName());
 			if(!(udDataInfo.isEmpty())){
 				for (Map.Entry<Object, NodeDataInfo> _udDataInfo : udDataInfo.entrySet()) {
 					FlowNode udFn = (FlowNode) _udDataInfo.getKey();
+					out.write("\n"+smFn.getName()+"\t"+udFn.getName());
 					if (smFn.getName().equals(udFn.getName())) {
-						NodeDataInfo udCurrent = _udDataInfo.getValue();;
+						NodeDataInfo udCurrent = _udDataInfo.getValue();
 						NodeDataInfo smCurrent = _smDataInfo.getValue();
 						for(Object _nd : smCurrent.getDataIn()){
+							out.write("\n"+_nd+"\t"+udCurrent.getDataIn());
 							if(!(udCurrent.getDataIn().contains(_nd))){
 								addError(udFn.getId(),"Missing Data Input:" + _nd);
 							}
@@ -355,61 +385,96 @@ public class BPMN2ComplianceChecker {
 			
 			}
 		}
+		
+		out.close();
+		  }catch (Exception e){//Catch exception if any
+		  System.err.println("Error: " + e.getMessage());
+		  }
 			
 			
 	}
 	
 
 	private void findTarget(Object _obj){
-   	    
-		Set set = tmpSmList.entrySet(); 
-		Iterator iter1 = set.iterator();
-		while(iter1.hasNext()){
-			Map.Entry me = (Map.Entry)iter1.next(); 
-			FlowNode sf = (FlowNode) me.getKey();
-				if (_obj.equals(sf)) {
+   	  try{ 
+   		
+		for (Map.Entry<Object, List<Object>> entry : tmpSmList.entrySet()) {
+			FlowNode _key = (FlowNode) entry.getKey();
+				if (_obj.equals(_key)) {
 			   		List current = new ArrayList();
-			   		current = tmpSmList.get(me.getKey());
-			   		for(Object temp: current ) {
-		   				FlowNode ssf = (FlowNode) temp;
-		   				if(!(ssf instanceof Gateway)){
-		   					if(!tmp.contains(ssf)) {
-		   						tmp.add(temp);
-		   					}
-			   			} else {
-			   			if((ssf instanceof Gateway) && ((FlowNode) me.getKey() instanceof Gateway)){ 
-			   				_obj = ssf;
-			   				findTarget(ssf);
+			   		current = entry.getValue();
+			   		for(Object _value: current ) {
+		   				FlowNode value = (FlowNode) _value;
+		   				if(!(value instanceof Gateway)&&!tmp.contains(value)) {
+		   					tmp.add(value);
+			   			} else if((value instanceof Gateway)){ 
+			   				findTarget(value);
 			   			}
 			   		}
 			   	}
-	   	       }
 	   	   }
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 		
-	private void findTargetUdm(Object _obj){
-   	    
-		Set set = tmpUmList.entrySet(); 
-		Iterator iter1 = set.iterator();
-		while(iter1.hasNext()){
-			Map.Entry me = (Map.Entry)iter1.next(); 
-			FlowNode sf = (FlowNode) me.getKey();
-				if (_obj.equals(sf)) {
-			   		List current = new ArrayList();
-			   		current = tmpUmList.get(me.getKey());
-			   		for(Object temp: current ) {
-		   				FlowNode ssf = (FlowNode) temp;
-		   				if(!(ssf instanceof Gateway)){
-		   					if(!tmp.contains(ssf)) {
-		   						tmp.add(temp);
-		   					}
-		   				}
-			   				_obj = ssf;
-			   				findTargetUdm(ssf);
-		   			}
-	   	       }
-	   	   }
-	}
+	private void findTargetUdm(Object _obj, Object _mainKey){ //key g1 - g2
+		FlowNode value = null;
+		try{		
+			for (Map.Entry<Object, List<Object>> entry : tmpUmList.entrySet()) { 
+					stopLoop = true;
+ 					FlowNode _key = (FlowNode) entry.getKey();
+ 					if (_obj.equals(_key)) { //g1 - g2
+ 				   		List current = new ArrayList();
+ 				   		current = entry.getValue();
+	 				   	for (int i = 0; i < current.size(); i++) { //start & g2 - b
+ 			   				value = (FlowNode) current.get(i);
+ 			   				if(!(value instanceof Gateway) && (!tmp.contains(value)) && (!value.equals(_mainKey))) {
+ 			   					tmp.add(value); //start 
+ 				   			} 
+ 			   				if(value instanceof Gateway){
+ 			   				List keyVal = new ArrayList(); 
+ 				   			keyVal =	tmpUmList.get(value); // value = g2 , keyVal = b 
+ 					   		for(Object _keyVal: keyVal ) {
+ 				   				FlowNode _val = (FlowNode) _keyVal; //b
+ 				   				if(tmp.contains(_val)) { //start,
+ 				   					stopLoop = false; 
+ 				   				} 
+ 		 				   	}
+ 				   			if(stopLoop){
+ 					   			findTargetUdm(value,_mainKey); //g2, g1
+ 					   		}
+ 				   			}
+ 			   			}
+	 				   List keyVal = new ArrayList(); 
+			   			keyVal =	tmpUmList.get(value); // value = g2 , keyVal = b 
+				   		for(Object _keyVal: keyVal ) {
+			   				FlowNode _val = (FlowNode) _keyVal; //b
+			   				if(tmp.contains(_val)) { //start,
+			   					stopLoop = false; 
+			   				} 
+	 				   	}
+			   			if(stopLoop){
+				   			findTargetUdm(value,_mainKey); //g2, g1
+				   		}
+ 		   	      }
+ 		   	  }
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+/* 			   			List keyVal = new ArrayList(); 
+ 			   			keyVal =	tmpUmList.get(value); // value = g2 , keyVal = b 
+ 				   		for(Object _keyVal: keyVal ) {
+ 			   				FlowNode _val = (FlowNode) _keyVal; //b
+ 			   				if(tmp.contains(_val)) { //start,
+ 			   					stopLoop = false; 
+ 			   				} 
+	 				   	}
+ 			   			if(stopLoop){
+ 				   			findTargetUdm(value,_mainKey); //g2, g1
+ 				   		} 
+*/	
 	
 	private void addSequenceFlow(Object resourceId, Object obj) {		
 		if(tmpSmList.containsKey(resourceId) && tmpSmList.get(resourceId) != null) {
@@ -433,45 +498,86 @@ public class BPMN2ComplianceChecker {
 
 	
 	
-	private void smCheckData(FlowElementsContainer container) {
+	private void smCheckData(Process container) {
 					  
-		for(FlowElement fe : container.getFlowElements()) {
-					
-			if(fe instanceof Activity) {
-				Activity ut = (Activity) fe;
-				FlowNode fn = (FlowNode) fe;
-				List<DataInput> dataInputs = ut.getIoSpecification().getDataInputs();
-                List<DataOutput> dataOutputs = ut.getIoSpecification().getDataOutputs();
-                List<DataInputAssociation> dataInputAssociations = ut.getDataInputAssociations();
-                List<DataOutputAssociation> dataOutputAssociations = ut.getDataOutputAssociations();
-                
-                List<String> dataIn = new ArrayList<String>();
-                List<String> dataOut = new ArrayList<String>();
-                
-                for(DataInput din : dataInputs) {
-                	if(!(din.getName().equals("TaskName"))){
-                		dataIn.add(din.getName());
-                	}
-                }
-                for(DataOutput din : dataOutputs) {
-            		dataOut.add(din.getName());
-                }
-                
-                if(!(dataInputs.isEmpty() || !(dataOutputs.isEmpty()))){ 
-	                NodeDataInfo nodeDataInfo = new NodeDataInfo(dataIn, dataOut);
-	        		smDataInfo.put(fn, nodeDataInfo); 
-                }
-            }
+		try{
+		  
+	          List<Property> processProperties = container.getProperties();
+
+	          for(FlowElement fe : container.getFlowElements()) {
+			
+				if(fe instanceof Activity) {
+					Activity ut = (Activity) fe;
+					FlowNode fn = (FlowNode) fe;
+		
+					List<DataInput> dataInputs = ut.getIoSpecification().getDataInputs();
+	                List<DataOutput> dataOutputs = ut.getIoSpecification().getDataOutputs();
+	                List<DataInputAssociation> dataInputAssociations = ut.getDataInputAssociations();
+	                List<DataOutputAssociation> dataOutputAssociations = ut.getDataOutputAssociations();
+	                
+	                List<String> dataIn = new ArrayList<String>();
+	                List<String> dataOut = new ArrayList<String>();
+	                
+	                
+	                if(!dataInputs.isEmpty() && dataInputs != null){
+		                for(DataInput din : dataInputs) {
+	                        for(DataInputAssociation inputAssociations : dataInputAssociations) {
+	                                if(inputAssociations.getTargetRef().getId().equals(din.getId()) && !(din.getName().equals("TaskName") || din.getName().equals("ActorId") || din.getName().equals("GroupId")
+                                            || din.getName().equals("Skippable") || din.getName().equals("Priority") || din.getName().equals("Comment"))){
+	                                	for(Property prop : processProperties) {
+	                                        if(prop.getId().equals(inputAssociations.getSourceRef().get(0).getId())) {
+	                                        	dataIn.add(prop.getId());
+	                                        }
+	                                    }
+	                                }
+	                        }
+	                    }
+	                }
+
+		            if(!dataOutputs.isEmpty() && dataOutputs != null){    
+	                	for(DataOutput dout : dataOutputs) {
+	                        for(DataOutputAssociation outputAssociation : dataOutputAssociations) {
+	                            List<ItemAwareElement> sources = outputAssociation.getSourceRef();
+	                            for(ItemAwareElement iae : sources) {
+	                                if(iae.getId().equals(dout.getId())) {
+	                                	for(Property prop : processProperties) {
+	                                        if(prop.getId().equals(outputAssociation.getTargetRef().getId()) ) {
+	        			                		dataOut.add(prop.getId());
+	                                        }
+	                                    }
+	                                }
+	                            }
+	                        }
+	                    }
+		            }    
+	                
+		                
+		                if((!dataInputs.isEmpty() && dataInputs != null) || (!dataOutputs.isEmpty() && dataOutputs != null)){ 
+			                NodeDataInfo nodeDataInfo = new NodeDataInfo(dataIn, dataOut);
+			        		smDataInfo.put(fn, nodeDataInfo); 
+		                }
+		            }
+	            
+		 }
+		
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
+		
 	}
 	
-	private void udCheckData(FlowElementsContainer container) {
+	private void udCheckData(Process container) {
 		
-		for(FlowElement fe : container.getFlowElements()) {
+		try{
+		
+          	List<Property> processProperties = container.getProperties();
+
+			for(FlowElement fe : container.getFlowElements()) {
 					
 			if(fe instanceof Activity) {
 				Activity ut = (Activity) fe;
 				FlowNode fn = (FlowNode) fe;
+								
 				List<DataInput> dataInputs = ut.getIoSpecification().getDataInputs();
                 List<DataOutput> dataOutputs = ut.getIoSpecification().getDataOutputs();
                 List<DataInputAssociation> dataInputAssociations = ut.getDataInputAssociations();
@@ -479,22 +585,48 @@ public class BPMN2ComplianceChecker {
                 
                 List<String> dataIn = new ArrayList<String>();
                 List<String> dataOut = new ArrayList<String>();
-                
+
                 for(DataInput din : dataInputs) {
-                	if(!(din.getName().equals("TaskName"))){
-                		dataIn.add(din.getName());
-                	}
-                }
-                for(DataOutput din : dataOutputs) {
-            		dataOut.add(din.getName());
+                    for(DataInputAssociation inputAssociations : dataInputAssociations) {
+                        if(inputAssociations.getTargetRef().getId().equals(din.getId()) && !(din.getName().equals("TaskName") || din.getName().equals("ActorId") || din.getName().equals("GroupId")
+                                || din.getName().equals("Skippable") || din.getName().equals("Priority") || din.getName().equals("Comment"))){
+                            	for(Property prop : processProperties) {
+                                    if(prop.getId().equals(inputAssociations.getSourceRef().get(0).getId())) {
+                                    	dataIn.add(prop.getId());
+                                    }
+                                }
+                            }
+                    }
                 }
                 
-                if(!(dataInputs.isEmpty() || !(dataOutputs.isEmpty()))){ 
+                for(DataOutput dout : dataOutputs) {
+                    for(DataOutputAssociation outputAssociation : dataOutputAssociations) {
+                        List<ItemAwareElement> sources = outputAssociation.getSourceRef();
+                        for(ItemAwareElement iae : sources) {
+                            if(iae.getId().equals(dout.getId())) {
+                            	for(Property prop : processProperties) {
+                                    if(prop.getId().equals(outputAssociation.getTargetRef().getId()) ) {
+    			                		dataOut.add(prop.getId());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+               
+                
+                if((!dataInputs.isEmpty() && dataInputs != null) || (!dataOutputs.isEmpty() && dataOutputs != null)){ 
 	                NodeDataInfo nodeDataInfo = new NodeDataInfo(dataIn, dataOut);
-	        		udDataInfo.put(fn, nodeDataInfo);
+	        		udDataInfo.put(fn, nodeDataInfo); 
                 }
 			}
 		}
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
 	}
 
 	public Map<String, List<String>> getErrors() {
