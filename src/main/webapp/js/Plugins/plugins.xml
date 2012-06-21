@@ -342,6 +342,7 @@
 		<plugin source="theme.js" name="ORYX.Plugins.Theme"/>
 		<plugin source="locknode.js" name="ORYX.Plugins.LockNode"/>
 		<plugin source="adaptive.js" name="ORYX.Plugins.Adaptive"/>
+		<plugin source="migrateInstance.js" name="ORYX.Plugins.MigrateInstance"/>
 		
 		<!-- <plugin source="stencilsetmanipulator.js" name="ORYX.Plugins.StencilSetManipulator" 
 			/> -->
