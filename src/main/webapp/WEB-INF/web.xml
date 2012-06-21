@@ -69,6 +69,11 @@
   <servlet-class>org.jbpm.designer.web.server.ComplianceCheckerServlet</servlet-class>
  </servlet>
  <servlet>
+  <display-name>MigrateInstance</display-name>
+  <servlet-name>MigrateInstanceServlet</servlet-name>
+  <servlet-class>org.jbpm.designer.web.server.MigrateInstanceServlet</servlet-class>
+ </servlet>
+ <servlet>
   <display-name>Transformer</display-name>
   <servlet-name>TransformerServlet</servlet-name>
   <servlet-class>org.jbpm.designer.web.server.TransformerServlet</servlet-class>
@@ -156,6 +161,9 @@
   <servlet-mapping>
   <servlet-name>ComplianceCheckerServlet</servlet-name>
   <url-pattern>/compliancecheck</url-pattern>
+ </servlet-mapping>
+   <servlet-name>MigrateInstanceServlet</servlet-name>
+  <url-pattern>/migrateinstance</url-pattern>
  </servlet-mapping>
  <servlet-mapping>
   <servlet-name>DirectoryListingServlet</servlet-name>

@@ -24,67 +24,60 @@ ORYX.Plugins.Adaptive = ORYX.Plugins.AbstractPlugin.extend({
 			//alert(id);	
 			
 			Ext.Ajax.request({
-            url: "http://localhost:8080/gwt-console-server/rs/process/definition/"+ id + "/instances",
+            url: window.location.protocol + "//" + window.location.host +"/gwt-console-server/rs/process/definition/"+ id + "/instances",
             method: 'GET',
             success: function(response){
     	   		try {   	   			
     	   			if(response.responseText && response.responseText.length > 0) {
 	   	   				var instancesjson = response.responseText.evalJSON();
     	   				var instancesobj = instancesjson["instances"];
- 
-    		        	for(var i=0;i<instancesobj.length;i++){
-    	   					var toapplyobj = instancesobj[i];
-	    	   				//alert(instancesobj[i].id);
-	    	   				//alert(instancesobj[i].rootToken.currentNodeName);
-    	   					this.checkNodes(toapplyobj);
-    	   					//this.checkNodes.bind(this, instancesobj[i])
-    	   				}
-	   	   			} else {
-	    	   				Ext.Msg.alert('Invalid Instances data1.');
+    	   				if(instancesobj[0] != null){
+	   	   					this.checkNodes(instancesobj[0]);
+	   	   				} else {
+	    	   				Ext.Msg.alert('No Instances available for '+id);	   	   					
+	   	   				}
+ 	   	   			} else {
+	    	   				Ext.Msg.alert('Invalid Instances data.');
 	    	   			}
 	    	   		} catch(e) {
-	    	   			Ext.Msg.alert('Error applying Instances data2:\n' + e);
+	    	   			Ext.Msg.alert('Error applying Instances data1:\n' + e);
 	    	   		}
 	            }.bind(this),
 	            failure: function(){
-	            	Ext.Msg.alert('Error applying Instances data.');
+	            	Ext.Msg.alert('Error applying Instances data2.');
 	            }
-         	});		
+         	});	
+         	
+         		
 	},
 
-	checkNodes: function(toapplyobj) {
-		var canvas = this.facade.getCanvas();
-
-		ORYX.EDITOR._canvas.getChildNodes().each((function(child) {
-				if(child.properties["oryx-name"] == toapplyobj.rootToken.currentNodeName){
-					//alert(child.properties["oryx-name"]);
-					child.setProperty("oryx-bordercolor", "#888888");
-    				child.setProperty("oryx-bgcolor", "#CCEEFF");
-    		   		child.setSelectable(false);
-		    		child.setMovable(false);
-		    		child.refresh();
-/*    				if(child.getChildren().size() > 0) {
-						for (var i = 0; i < shape.getChildren().size(); i++) {
-							if(child.getChildren()[i] instanceof ORYX.Core.Node || child.getChildren()[i] instanceof ORYX.Core.Node) {
-								this.lockShape(shape.getChildren()[i]);
-							}
-						}
-    				}*/
-	    	}
-    	}).bind(this));
-		
-		/*var childthemestr = themeObj[childgroup];
-		if(childthemestr && child.properties["oryx-isselectable"] != "false") { 
-			var themestrparts = childthemestr.split("|");
-			child.setProperty("oryx-bgcolor", themestrparts[0]);
-			child.setProperty("oryx-bordercolor", themestrparts[1]);
-			child.setProperty("oryx-fontcolor", themestrparts[2]);
-			child.refresh();
-		}
-		if(child.getChildNodes().size() > 0) {
-			for (var i = 0; i < child.getChildNodes().size(); i++) {
-				this.applyThemeToNodes(child.getChildNodes()[i], themeObj);
+	checkNodes: function(instances) {
+		if(instances){
+			ORYX.EDITOR._canvas.getChildren().each((function(child) {
+				this.lockShape(child);
+				if(child.properties["oryx-name"] == instances.rootToken.currentNodeName){
+					throw $break;
+	    		}
+	    	}).bind(this));
+	   }
+	},
+	lockShape: function(shape) {
+		if(shape){
+			shape.setSelectable(false);
+    		shape.setMovable(false);
+    		if(shape instanceof ORYX.Core.Node || shape instanceof ORYX.Core.Edge) {
+    			shape.setProperty("oryx-bordercolor", "#888888");
+    			shape.setProperty("oryx-bgcolor", "#CCEEFF");
+    		}
+    		//shape.setProperty("oryx-isselectable", "false");
+    		shape.refresh();
+			if(shape.getChildren().size() > 0) {
+				for (var i = 0; i < shape.getChildren().size(); i++) {
+					if(shape.getChildren()[i] instanceof ORYX.Core.Node || shape.getChildren()[i] instanceof ORYX.Core.Node) {
+						this.lockShape(shape.getChildren()[i]);
+					}
+				}
 			}
-		}*/
-	}
+	    }
+	  }
 });
