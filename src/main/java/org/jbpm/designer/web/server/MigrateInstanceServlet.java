@@ -63,12 +63,11 @@ import org.jbpm.designer.web.repository.impl.UUIDBasedFileRepository;
 import org.jbpm.designer.web.repository.impl.UUIDBasedJbpmRepository;
 
 import org.jbpm.designer.bpmn2.compliance.BPMN2ComplianceChecker;
-import org.jbpm.workflow.instance.WorkflowProcessInstanceUpgrader;
 import org.json.JSONObject;
 
 /** 
  * 
- * Migrate Instance of a BPMN2 process.
+ * Check compliance of a BPMN2 process.
  * 
  * @author Saiful Omar
  */
@@ -76,6 +75,8 @@ import org.json.JSONObject;
 
 public class MigrateInstanceServlet extends HttpServlet {
 	
+	private static final String STANDARD_MODEL = "standard1";
+
     
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -87,14 +88,83 @@ public class MigrateInstanceServlet extends HttpServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 	    
-		String sessionId = req.getParameter("sessionId");
-        String newProcessId = req.getParameter("newProcessId");
-        Map<String, Long> mapping = new HashMap<String, Long>();
+		String json = req.getParameter("data");
+        String profileName = req.getParameter("profile");
+        String preprocessingData = req.getParameter("pp");
+        String uuid = req.getParameter("uuid");
+        String smName = req.getParameter("smName");        
+        //String smName = "standard1"; 
+        String action = req.getParameter("action");
+
+        IDiagramProfile profile = ServletUtil.getProfile(req, profileName, getServletContext());
         
-        //WorkflowProcessInstanceUpgrader.upgradeProcessInstance("rsa.application","12", "rsa.application2", mapping);
-        
-	}
+        if(action.equals("getProcessName")) {
+        	List<String> allProcessesList;
+			try {
+				allProcessesList = ServletUtil.getAllProcessesInPackage("globalArea", profile);
+			} catch (Throwable t) {
+				allProcessesList = new ArrayList<String>();
+			}
+	        JSONObject jsonObject = new JSONObject();
+			if(allProcessesList != null && allProcessesList.size() > 0) {
+				for(String allProcesses : allProcessesList) {
+					try {
+						jsonObject.put(allProcesses, allProcesses);
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+				}
+			}
+			resp.setCharacterEncoding("UTF-8");
+			resp.setContentType("application/json");
+			resp.getWriter().write(jsonObject.toString());
+        } else {
+	        //Definitions def = profile.createMarshaller().getDefinitions(json, preprocessingData);
+	        //List<RootElement> rootElements =  def.getRootElements();
+	               
+	        String sm = ServletUtil.getProcessSourceContent("globalArea", smName, profile);
+			Definitions smdef = getDefinitions(sm);
+			
+			Definitions udmdef = profile.createMarshaller().getDefinitions(json, preprocessingData);
+	
+			BPMN2ComplianceChecker checker = new BPMN2ComplianceChecker(smdef, udmdef);
+			checker.checkSyntax();
+			resp.setCharacterEncoding("UTF-8");
+	        resp.setContentType("application/json");
+	        
+	        if(checker.errorsFound()) {
+				resp.getWriter().write(checker.getErrorsAsJson().toString());
+			}
+        }
+}
 	
 	
+	private Definitions getDefinitions(String xml) {
+        try {
+            ResourceSet resourceSet = new ResourceSetImpl();
+            resourceSet
+                    .getResourceFactoryRegistry()
+                    .getExtensionToFactoryMap()
+                    .put(Resource.Factory.Registry.DEFAULT_EXTENSION,
+                            new JBPMBpmn2ResourceFactoryImpl());
+            resourceSet.getPackageRegistry().put(
+                    "http://www.omg.org/spec/BPMN/20100524/MODEL",
+                    Bpmn2Package.eINSTANCE);
+            XMLResource resource = (XMLResource) resourceSet.createResource(URI
+                    .createURI("inputStream://dummyUriWithValidSuffix.xml"));
+            resource.getDefaultLoadOptions().put(XMLResource.OPTION_ENCODING,
+                    "UTF-8");
+            resource.setEncoding("UTF-8");
+            Map<String, Object> options = new HashMap<String, Object>();
+            options.put(XMLResource.OPTION_ENCODING, "UTF-8");
+            InputStream is = new ByteArrayInputStream(xml.getBytes("UTF-8"));
+            resource.load(is, options);
+            return ((DocumentRoot) resource.getContents().get(0))
+                    .getDefinitions();
+        } catch (Throwable t) {
+            t.printStackTrace();
+            return null;
+        }
+    }
 }
 

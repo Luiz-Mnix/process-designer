@@ -20,12 +20,12 @@ ORYX.Plugins.Adaptive = ORYX.Plugins.AbstractPlugin.extend({
 	adaptive: function() {
 			var canvas = this.facade.getCanvas();
 		
-			var id = canvas.properties["oryx-id"];
-			//alert(id);	
-			
+			var oryxid = canvas.properties["oryx-id"];
+					
 			Ext.Ajax.request({
-            url: window.location.protocol + "//" + window.location.host +"/gwt-console-server/rs/process/definition/"+ id + "/instances",
-            method: 'GET',
+           	url: ORYX.PATH + "authenticateconsole",
+            method: 'POST',
+            asynchronous: false,
             success: function(response){
     	   		try {   	   			
     	   			if(response.responseText && response.responseText.length > 0) {
@@ -40,12 +40,16 @@ ORYX.Plugins.Adaptive = ORYX.Plugins.AbstractPlugin.extend({
 	    	   				Ext.Msg.alert('Invalid Instances data.');
 	    	   			}
 	    	   		} catch(e) {
-	    	   			Ext.Msg.alert('Error applying Instances data1:\n' + e);
+	    	   			Ext.Msg.alert('Error applying Instances data:\n' + e);
 	    	   		}
 	            }.bind(this),
-	            failure: function(){
-	            	Ext.Msg.alert('Error applying Instances data2.');
-	            }
+	        failure: function(){
+	            	Ext.Msg.alert('Error contacting the server.');
+	            },
+	        params: {
+                instanceid: oryxid
+            }
+
          	});	
          	
          		

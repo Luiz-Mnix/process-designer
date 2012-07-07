@@ -74,6 +74,11 @@
   <servlet-class>org.jbpm.designer.web.server.MigrateInstanceServlet</servlet-class>
  </servlet>
  <servlet>
+  <display-name>AuthenticateConsole</display-name>
+  <servlet-name>AuthenticateConsoleServlet</servlet-name>
+  <servlet-class>org.jbpm.designer.web.server.AuthenticateConsoleServlet</servlet-class>
+ </servlet>
+ <servlet>
   <display-name>Transformer</display-name>
   <servlet-name>TransformerServlet</servlet-name>
   <servlet-class>org.jbpm.designer.web.server.TransformerServlet</servlet-class>
@@ -158,11 +163,16 @@
   <servlet-name>EditorHandler</servlet-name>
   <url-pattern>/editor/*</url-pattern>
  </servlet-mapping>
-  <servlet-mapping>
+ <servlet-mapping>
   <servlet-name>ComplianceCheckerServlet</servlet-name>
   <url-pattern>/compliancecheck</url-pattern>
  </servlet-mapping>
-   <servlet-name>MigrateInstanceServlet</servlet-name>
+ <servlet-mapping>
+  <servlet-name>AuthenticateConsoleServlet</servlet-name>
+  <url-pattern>/authenticateconsole</url-pattern>
+ </servlet-mapping>
+ <servlet-mapping>
+  <servlet-name>MigrateInstanceServlet</servlet-name>
   <url-pattern>/migrateinstance</url-pattern>
  </servlet-mapping>
  <servlet-mapping>
